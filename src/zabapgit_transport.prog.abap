@@ -22,7 +22,9 @@ CLASS lcl_transport DEFINITION FINAL.
       resolve
         IMPORTING it_requests     TYPE trwbo_requests
         RETURNING VALUE(rt_tadir) TYPE scts_tadir
-        RAISING   lcx_exception.
+        RAISING   lcx_exception,
+      show_selected_requests
+        IMPORTING it_requests TYPE trwbo_requests.
 
 ENDCLASS.
 
@@ -43,6 +45,7 @@ CLASS lcl_transport IMPLEMENTATION.
     ENDIF.
 
     lt_requests = read_requests( lt_trkorr ).
+    show_selected_requests( lt_requests ).
     lt_tadir = resolve( lt_requests ).
     IF lines( lt_tadir ) = 0.
       lcx_exception=>raise( 'empty transport' ).
@@ -201,6 +204,75 @@ CLASS lcl_transport IMPLEMENTATION.
     SORT rt_tadir BY object ASCENDING obj_name ASCENDING.
     DELETE ADJACENT DUPLICATES FROM rt_tadir COMPARING object obj_name.
     DELETE rt_tadir WHERE table_line IS INITIAL.
+  ENDMETHOD.
+
+  METHOD show_selected_requests.
+
+    DATA: es_selected_request TYPE trwbo_request_header,
+          es_selected_task    TYPE trwbo_request_header,
+          ev_user_cancelled   TYPE c,
+          lt_requests         TYPE strhi_requests_wd,
+          lt_selections       TYPE trwbo_selections.
+
+    FIELD-SYMBOLS: <fs_request>  LIKE LINE OF it_requests,
+                   <fs_request2> LIKE LINE OF lt_requests,
+                   <fs_sel>      LIKE LINE OF lt_selections.
+
+    LOOP AT it_requests ASSIGNING <fs_request>.
+      APPEND INITIAL LINE TO lt_requests ASSIGNING <fs_request2>.
+      MOVE-CORRESPONDING <fs_request> TO <fs_request2>.
+
+      APPEND INITIAL LINE TO lt_selections ASSIGNING <fs_sel>.
+      <fs_sel>-trkorrpattern = <fs_request>-h-trkorr.
+    ENDLOOP.
+
+    CALL FUNCTION 'TRINT_PRESENT_REQUESTS'
+      EXPORTING
+        iv_organizer_type                 = 'W'
+        iv_username                       = sy-uname
+        it_selections                     = lt_selections
+        iv_title                          = 'abapGit: Selected Requests for Transport to ZIP'
+        iv_cua_status                     = 'TDR_FULL'
+*       is_new_request_props              =
+*       is_popup                          =
+*       it_special_requests               =
+*       iv_prog_top_of_page               = ' '
+*       iv_form_top_of_page               = ' '
+*       is_sorting                        =
+*       iv_exit_if_nothing_selected       = ' '
+*     IMPORTING
+*       es_selected_request               =
+*       es_selected_task                  =
+*       ev_user_cancelled                 =
+     EXCEPTIONS
+       nothing_selected                  = 1
+       OTHERS                            = 2.
+    IF sy-subrc <> 0.
+* Implement suitable error handling here
+    ENDIF.
+
+*    CALL FUNCTION 'TRINT_DISPLAY_REQUESTS'
+*      EXPORTING
+*        iv_title                = 'abapGit: Selected Requests for Transport to ZIP'
+*        iv_first_node_text      = 'Selected requests'
+**        iv_mark_default_request = lv_mark_default_request
+*        iv_cua_status           = 'TDR_FULL'
+**        is_new_request_props    = is_new_request_props
+**        is_popup                = is_popup
+*        it_requests             = lt_requests
+**        it_special_requests     = it_special_requests
+**        iv_prog_top_of_page     = iv_prog_top_of_page
+**        iv_form_top_of_page     = iv_form_top_of_page
+*      IMPORTING
+**        ev_refresh              = lv_refresh
+*        es_selected_request     = es_selected_request
+*        es_selected_task        = es_selected_task
+*        ev_user_cancelled       = ev_user_cancelled
+*      CHANGING
+**        cs_sort_description     = ls_wbo_sorting
+**        cs_layout               = ls_layout
+*        cv_username             = sy-uname.
+
   ENDMETHOD.
 
 ENDCLASS.
